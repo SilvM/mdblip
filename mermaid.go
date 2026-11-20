@@ -186,13 +186,14 @@ func (m *model) diagramDone(msg diagramMsg) tea.Cmd {
 
 // renderDoc renders the document, showing finished diagrams as images. The
 // returned command sends any image whose placement is new or has changed.
-func (m *model) renderDoc() ([]string, tea.Cmd) {
+func (m *model) renderDoc() ([]string, []heading, tea.Cmd) {
 	width := m.width - gutter
 	if !m.images {
-		return render(m.src, width, m.wrap), nil
+		lines, heads := takeHeadings(renderMarked(m.src, width, m.wrap))
+		return lines, heads, nil
 	}
 	src := mermaidBlocks(m.src, func(key, _ string) bool { return m.diagrams[key].ready() })
-	lines := render(src, width, m.wrap)
+	lines := renderMarked(src, width, m.wrap)
 	out := make([]string, 0, len(lines))
 	var cmds []tea.Cmd
 	cellW, ratio := cellSize()
@@ -210,7 +211,8 @@ func (m *model) renderDoc() ([]string, tea.Cmd) {
 		}
 		out = append(out, d.lines...)
 	}
-	return out, tea.Batch(cmds...)
+	out, heads := takeHeadings(out)
+	return out, heads, tea.Batch(cmds...)
 }
 
 // resend transmits every finished image again, for a terminal that may have

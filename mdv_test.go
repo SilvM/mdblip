@@ -276,3 +276,82 @@ func TestHoverUnderlinesLink(t *testing.T) {
 		t.Error("underline stayed after moving off the link")
 	}
 }
+
+const foldDoc = "# Top\n\nintro\n\n## One\n\nalpha\n\n### Deep\n\nbeta\n\n## Two\n\ngamma\n"
+
+func shown(t *testing.T, m model, size, keys string) []string {
+	t.Helper()
+	out, err := frame(m, size, keys)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var lines []string
+	for _, l := range strings.Split(ansi.Strip(out), "\n") {
+		if l = strings.TrimSpace(l); l != "" {
+			lines = append(lines, l)
+		}
+	}
+	return lines[:len(lines)-1]
+}
+
+func TestFoldKeys(t *testing.T) {
+	m := model{path: "x.md", src: foldDoc, wrap: true}
+	cases := []struct {
+		size, keys string
+		want       []string
+	}{
+		{"40x20", "", []string{"# Top", "intro", "## One", "alpha", "### Deep", "beta", "## Two", "gamma"}},
+		{"40x20", "tab", []string{"▸ # Top ⋯ 14 lines"}},
+		{"40x20", "tab tab", []string{"# Top", "intro", "## One", "alpha", "### Deep", "beta", "## Two", "gamma"}},
+		{"40x6", "} } tab", []string{"▸ ## One ⋯ 7 lines", "## Two", "gamma"}},
+		{"40x20", "shift+tab", []string{"▸ # Top ⋯ 14 lines"}},
+		{"40x20", "shift+tab tab", []string{"# Top", "intro", "▸ ## One ⋯ 7 lines", "▸ ## Two ⋯ 2 lines"}},
+		{"40x20", "shift+tab shift+tab", []string{"# Top", "intro", "## One", "alpha", "### Deep", "beta", "## Two", "gamma"}},
+	}
+	for _, c := range cases {
+		if got := shown(t, m, c.size, c.keys); !reflect.DeepEqual(got, c.want) {
+			t.Errorf("keys %q:\ngot  %q\nwant %q", c.keys, got, c.want)
+		}
+	}
+}
+
+func TestFoldClickAndReload(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "doc.md")
+	os.WriteFile(path, []byte(foldDoc), 0o644)
+	var m tea.Model = model{path: path, src: foldDoc, wrap: true}
+	m, _ = m.Update(tea.WindowSizeMsg{Width: 40, Height: 20})
+	row := func(text string) int {
+		for i, l := range m.(model).lines {
+			if strings.Contains(ansi.Strip(l), text) {
+				return i
+			}
+		}
+		return -1
+	}
+	m, _ = m.Update(tea.MouseClickMsg{X: 5, Y: row("## One"), Button: tea.MouseLeft})
+	if row("alpha") >= 0 || row("## Two") < 0 {
+		t.Fatal("click on a heading did not fold its section")
+	}
+	m, _ = m.Update(tea.MouseClickMsg{X: 5, Y: row("intro"), Button: tea.MouseLeft})
+	if row("alpha") >= 0 {
+		t.Fatal("click on plain text changed the folds")
+	}
+
+	os.WriteFile(path, []byte(strings.Replace(foldDoc, "gamma", "gamma edited", 1)), 0o644)
+	m, _ = m.Update(reloadMsg{})
+	if row("alpha") >= 0 || row("gamma edited") < 0 {
+		t.Fatal("edit outside the fold should leave it folded")
+	}
+	if len(m.(model).blips) == 0 {
+		t.Error("edited line did not blip")
+	}
+
+	os.WriteFile(path, []byte(strings.Replace(foldDoc, "beta", "beta edited", 1)), 0o644)
+	m, _ = m.Update(reloadMsg{})
+	if row("beta edited") < 0 {
+		t.Fatal("edit inside a folded section did not open it")
+	}
+	if got := m.(model).blips[row("beta edited")]; got == 0 {
+		t.Error("line edited inside the fold did not blip")
+	}
+}

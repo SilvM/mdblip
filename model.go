@@ -29,7 +29,12 @@ type (
 type model struct {
 	path          string
 	src           string
-	lines         []string
+	all           []string // the whole rendered document
+	heads         []heading
+	folded        map[string]bool
+	lines         []string // what is shown: all, minus folded sections
+	vis           []int    // index into all for each shown line
+	foldMark      map[int]bool
 	offset, xoff  int
 	width, height int
 	wrap, help    bool
@@ -71,6 +76,8 @@ func init() {
 		{[]string{"G", "end"}, "bottom", func(m *model) tea.Cmd { m.scroll(len(m.lines)); return nil }},
 		{[]string{"}"}, "next paragraph", func(m *model) tea.Cmd { m.paragraph(1); return nil }},
 		{[]string{"{"}, "previous paragraph", func(m *model) tea.Cmd { m.paragraph(-1); return nil }},
+		{[]string{"tab"}, "fold or open the section in view (or click a heading)", func(m *model) tea.Cmd { m.toggleFold(m.currentHead()); return nil }},
+		{[]string{"shift+tab"}, "fold or open all sections", func(m *model) tea.Cmd { m.toggleAllFolds(); return nil }},
 		{[]string{"w"}, "toggle line wrap", func(m *model) tea.Cmd { m.wrap = !m.wrap; return m.rerender() }},
 		{[]string{"m"}, "toggle mermaid diagrams as images", func(m *model) tea.Cmd { return m.toggleImages() }},
 		{[]string{"l", "right"}, "scroll right (unwrapped)", func(m *model) tea.Cmd { m.hscroll(hstep); return nil }},
@@ -83,6 +90,8 @@ func init() {
 		{[]string{"q", "ctrl+c"}, "quit", func(*model) tea.Cmd { return tea.Quit }},
 	}
 }
+
+const foldGutter = "\x1b[38;2;146;131;116m▸\x1b[m "
 
 var (
 	statusBar = lipgloss.NewStyle().Background(lipgloss.Color(bg1)).Foreground(lipgloss.Color(gray))
@@ -126,8 +135,9 @@ func (m *model) hscroll(delta int) {
 
 // rerender redraws the document after a layout change, without blips.
 func (m *model) rerender() tea.Cmd {
-	lines, cmd := m.renderDoc()
-	m.lines = lines
+	var cmd tea.Cmd
+	m.all, m.heads, cmd = m.renderDoc()
+	m.applyFolds()
 	m.blips = nil
 	m.scroll(0)
 	m.hscroll(0)
@@ -147,9 +157,19 @@ func (m *model) toggleImages() tea.Cmd {
 // refresh redraws the document after its content changed, blipping the
 // changed lines and optionally scrolling the first one into view.
 func (m *model) refresh(blips, follow bool) tea.Cmd {
-	lines, cmd := m.renderDoc()
-	diff := changed(m.lines, lines)
-	m.lines = lines
+	all, heads, cmd := m.renderDoc()
+	changedLines := changed(m.all, all)
+	m.all, m.heads = all, heads
+	if follow {
+		m.unfoldChanged(changedLines)
+	}
+	m.applyFolds()
+	diff := map[int]bool{}
+	for i, line := range m.vis {
+		if changedLines[line] {
+			diff[i] = true
+		}
+	}
 	m.blips = make(map[int]int, len(diff))
 	first := -1
 	for i := range diff {
@@ -308,6 +328,8 @@ func (m model) View() tea.View {
 					b.WriteString(mark(line, orange, 1, 0.3, width))
 				case m.matched[i]:
 					b.WriteString(mark(line, orange, 0.6, 0, width))
+				case m.foldMark[i]:
+					b.WriteString(foldGutter + line)
 				default:
 					b.WriteString("  " + line)
 				}

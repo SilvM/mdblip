@@ -42,7 +42,8 @@ func tint(line, bg string, width int) string {
 
 func ptr[T any](v T) *T { return &v }
 
-func heading(prefix, color string) ansi.StyleBlock {
+func headingStyle(level int, color string) ansi.StyleBlock {
+	prefix := string(headBase+rune(level)) + strings.Repeat("#", level) + " "
 	return ansi.StyleBlock{StylePrimitive: ansi.StylePrimitive{Prefix: prefix, Color: ptr(color)}}
 }
 
@@ -57,12 +58,12 @@ var gruvbox = ansi.StyleConfig{
 	Heading: ansi.StyleBlock{
 		StylePrimitive: ansi.StylePrimitive{BlockSuffix: "\n", Bold: ptr(true)},
 	},
-	H1:            heading("# ", yellow),
-	H2:            heading("## ", orange),
-	H3:            heading("### ", aqua),
-	H4:            heading("#### ", blue),
-	H5:            heading("##### ", purple),
-	H6:            heading("###### ", gray),
+	H1:            headingStyle(1, yellow),
+	H2:            headingStyle(2, orange),
+	H3:            headingStyle(3, aqua),
+	H4:            headingStyle(4, blue),
+	H5:            headingStyle(5, purple),
+	H6:            headingStyle(6, gray),
 	Strikethrough: ansi.StylePrimitive{CrossedOut: ptr(true)},
 	Emph:          ansi.StylePrimitive{Italic: ptr(true), Color: ptr(purple)},
 	Strong:        ansi.StylePrimitive{Bold: ptr(true), Color: ptr(orange)},
@@ -99,6 +100,12 @@ var (
 // render returns the rendered lines; with wrap off, lines keep their natural
 // length and the caller scrolls horizontally.
 func render(src string, width int, wrap bool) []string {
+	lines, _ := takeHeadings(renderMarked(src, width, wrap))
+	return lines
+}
+
+// renderMarked is render with the heading sentinels still in place.
+func renderMarked(src string, width int, wrap bool) []string {
 	width = max(width, 10)
 	wrapWidth := 0
 	if wrap {

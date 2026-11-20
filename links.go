@@ -64,6 +64,9 @@ func (m *model) linkUnder(x, y int) string {
 func (m *model) click(x, y int) {
 	target := m.linkUnder(x, y)
 	if target == "" {
+		if !m.help && y < m.page() {
+			m.toggleFold(m.headAt(m.offset + y))
+		}
 		return
 	}
 	u, err := url.Parse(target)
