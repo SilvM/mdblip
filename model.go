@@ -38,6 +38,8 @@ type model struct {
 	matches       []int
 	matched       map[int]bool
 	cur           int
+	notice        string
+	hover         string
 	blips         map[int]int
 	ticking       bool
 	updated       time.Time
@@ -64,6 +66,8 @@ func init() {
 		{[]string{"b", "pgup"}, "page up", func(m *model) tea.Cmd { m.scroll(-m.page()); return nil }},
 		{[]string{"g", "home"}, "top", func(m *model) tea.Cmd { m.offset = 0; return nil }},
 		{[]string{"G", "end"}, "bottom", func(m *model) tea.Cmd { m.scroll(len(m.lines)); return nil }},
+		{[]string{"}"}, "next paragraph", func(m *model) tea.Cmd { m.paragraph(1); return nil }},
+		{[]string{"{"}, "previous paragraph", func(m *model) tea.Cmd { m.paragraph(-1); return nil }},
 		{[]string{"w"}, "toggle line wrap", func(m *model) tea.Cmd { m.wrap = !m.wrap; m.rerender(); return nil }},
 		{[]string{"l", "right"}, "scroll right (unwrapped)", func(m *model) tea.Cmd { m.hscroll(hstep); return nil }},
 		{[]string{"h", "left"}, "scroll left (unwrapped)", func(m *model) tea.Cmd { m.hscroll(-hstep); return nil }},
@@ -91,6 +95,21 @@ func (m model) page() int { return max(m.height-1, 1) }
 
 func (m *model) scroll(delta int) {
 	m.offset = max(min(m.offset+delta, len(m.lines)-m.page()), 0)
+}
+
+// paragraph moves the top of the screen to the next or previous blank line,
+// like vim's } and {.
+func (m *model) paragraph(dir int) {
+	i := m.offset + dir
+	for i > 0 && i < len(m.lines) && !m.blank(i) {
+		i += dir
+	}
+	m.offset = i
+	m.scroll(0)
+}
+
+func (m *model) blank(i int) bool {
+	return !strings.Contains(m.lines[i], codeBg) && strings.TrimSpace(ansi.Strip(m.lines[i])) == ""
 }
 
 func (m *model) hscroll(delta int) {
@@ -137,7 +156,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case tea.MouseWheelDown:
 			m.scroll(3)
 		}
+	case tea.MouseMotionMsg:
+		m.hover = m.linkUnder(msg.X, msg.Y)
+	case tea.MouseClickMsg:
+		if msg.Button == tea.MouseLeft {
+			m.click(msg.X, msg.Y)
+		}
 	case tea.KeyPressMsg:
+		m.notice = ""
 		return m.press(msg.String())
 	}
 	return m, nil
@@ -241,7 +267,11 @@ func (m model) View() tea.View {
 		width := m.width - gutter
 		for i := m.offset; i < m.offset+m.page(); i++ {
 			if i < len(m.lines) {
-				line := ansi.Cut(m.lines[i], m.xoff, m.xoff+width)
+				line := m.lines[i]
+				if m.hover != "" {
+					line = underline(line, m.hover)
+				}
+				line = ansi.Cut(line, m.xoff, m.xoff+width)
 				frames, blipping := m.blips[i]
 				switch {
 				case blipping:
@@ -260,7 +290,7 @@ func (m model) View() tea.View {
 	b.WriteString(m.status())
 	v := tea.NewView(b.String())
 	v.AltScreen = true
-	v.MouseMode = tea.MouseModeCellMotion
+	v.MouseMode = tea.MouseModeAllMotion
 	v.WindowTitle = filepath.Base(m.path)
 	return v
 }
@@ -293,6 +323,8 @@ func (m model) status() string {
 		s += "  updated " + m.updated.Format("15:04:05")
 	}
 	switch {
+	case m.notice != "":
+		s = " " + m.notice
 	case m.searching || m.query != "":
 		s = " /" + m.query
 		if m.searching {

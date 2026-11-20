@@ -73,7 +73,7 @@ var gruvbox = ansi.StyleConfig{
 	Item:        ansi.StylePrimitive{BlockPrefix: "• "},
 	Enumeration: ansi.StylePrimitive{BlockPrefix: ". ", Color: ptr(aqua)},
 	Task:        ansi.StyleTask{Ticked: "[✓] ", Unticked: "[ ] "},
-	Link:        ansi.StylePrimitive{Color: ptr(blue), Underline: ptr(true)},
+	Link:        ansi.StylePrimitive{Color: ptr(blue)},
 	LinkText:    ansi.StylePrimitive{Color: ptr(aqua), Bold: ptr(true)},
 	Image:       ansi.StylePrimitive{Color: ptr(blue), Underline: ptr(true)},
 	ImageText:   ansi.StylePrimitive{Color: ptr(aqua), Format: "Image: {{.text}} →"},

@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
 )
 
@@ -189,5 +190,89 @@ func TestSearchNavigation(t *testing.T) {
 	cleared, _ := frame(m, "40x10", "/ a p l enter esc")
 	if !strings.Contains(ansi.Strip(cleared), "? help") {
 		t.Errorf("esc did not clear search:\n%s", ansi.Strip(cleared))
+	}
+}
+
+func TestParagraphJump(t *testing.T) {
+	src := "one\n\ntwo\ntwo b\n\n```\ncode\n```\n\nthree\n\n" + strings.Repeat("tail\n\n", 20)
+	m := model{path: "x.md", src: src, wrap: true}
+	top := func(keys string) string {
+		out, _ := frame(m, "40x6", keys)
+		lines := strings.Split(ansi.Strip(out), "\n")
+		return strings.TrimSpace(lines[0]) + "|" + strings.TrimSpace(lines[1])
+	}
+	for keys, want := range map[string]string{
+		"}":     "|two two b",
+		"} }":   "|",
+		"} } }": "|three",
+		"} } {": "|two two b",
+		"} { {": "one|",
+	} {
+		if got := top(keys); got != want {
+			t.Errorf("keys %q: top is %q, want %q", keys, got, want)
+		}
+	}
+}
+
+func TestClickOpensLink(t *testing.T) {
+	var opened []string
+	defer func(orig func(string) error) { openURL = orig }(openURL)
+	openURL = func(target string) error { opened = append(opened, target); return nil }
+
+	var m tea.Model = model{path: "x.md", src: "see [the docs](https://example.com/docs) and [local](other.md)\n", wrap: true}
+	m, _ = m.Update(tea.WindowSizeMsg{Width: 80, Height: 10})
+	plain := ansi.Strip(m.(model).lines[0])
+	click := func(word string) model {
+		x := ansi.StringWidth(plain[:strings.Index(plain, word)]) + gutter + 1
+		next, _ := m.Update(tea.MouseClickMsg{X: x, Y: 0, Button: tea.MouseLeft})
+		return next.(model)
+	}
+	click("see")
+	if len(opened) != 0 {
+		t.Fatalf("plain text opened %v", opened)
+	}
+	click("the docs")
+	click("https://example.com")
+	if len(opened) != 2 || opened[0] != "https://example.com/docs" || opened[1] != opened[0] {
+		t.Fatalf("opened %v, want the docs link twice", opened)
+	}
+	if got := click("local"); len(opened) != 2 || !strings.Contains(got.notice, "not a web link") {
+		t.Fatalf("relative link: opened %v, notice %q", opened, got.notice)
+	}
+}
+
+func TestWrappedLinkStaysClickable(t *testing.T) {
+	lines := render("[a fairly long link text that wraps](https://example.com/a/b/c/d/e)\n", 20, true)
+	for i, l := range lines {
+		if strings.TrimSpace(ansi.Strip(l)) != "" && linkAt(l, 1) == "" {
+			t.Errorf("line %d of wrapped link is not clickable: %q", i, ansi.Strip(l))
+		}
+	}
+}
+
+func TestHoverUnderlinesLink(t *testing.T) {
+	var m tea.Model = model{path: "x.md", src: "see [the docs](https://example.com/docs) and [other](https://example.org)\n", wrap: true}
+	m, _ = m.Update(tea.WindowSizeMsg{Width: 80, Height: 10})
+	if strings.Contains(m.View().Content, "\x1b[4m") {
+		t.Fatal("link underlined without hover")
+	}
+	plain := ansi.Strip(m.(model).lines[0])
+	hover := func(word string) string {
+		x := ansi.StringWidth(plain[:strings.Index(plain, word)]) + gutter + 1
+		next, _ := m.Update(tea.MouseMotionMsg{X: x, Y: 0})
+		return next.View().Content
+	}
+	over := hover("the docs")
+	if n := strings.Count(over, "\x1b[4m"); n == 0 {
+		t.Fatal("hovered link not underlined")
+	}
+	if ansi.Strip(over) != ansi.Strip(m.View().Content) {
+		t.Error("hover changed the text")
+	}
+	if i := strings.Index(over, "other"); strings.LastIndex(over[:i], "\x1b[4m") > strings.LastIndex(over[:i], "\x1b[24m") {
+		t.Error("underline leaked onto the other link")
+	}
+	if strings.Contains(hover("see"), "\x1b[4m") {
+		t.Error("underline stayed after moving off the link")
 	}
 }
