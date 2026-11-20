@@ -1,4 +1,4 @@
-BIN := mdv
+BIN := mdblip
 PREFIX ?= $(HOME)/.local
 
 .PHONY: all tidy test build install clean

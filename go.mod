@@ -1,4 +1,4 @@
-module mdv
+module mdblip
 
 go 1.27.3
 

@@ -18,7 +18,7 @@ func main() {
 	keys := flag.String("keys", "", "headless: space-separated keys to press before printing, e.g. 'w l ?'")
 	color := flag.Bool("ansi", false, "headless: keep colour escape codes in the output")
 	flag.Usage = func() {
-		fmt.Fprintln(os.Stderr, "usage: mdv [flags] <file.md>")
+		fmt.Fprintln(os.Stderr, "usage: mdblip [flags] <file.md>")
 		flag.PrintDefaults()
 	}
 	flag.Parse()

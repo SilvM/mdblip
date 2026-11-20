@@ -55,7 +55,7 @@ const (
 var mmdcSlots = make(chan struct{}, 2)
 
 // cacheDir lives in the system temp directory, which the OS clears itself.
-func cacheDir() string { return filepath.Join(os.TempDir(), "mdv") }
+func cacheDir() string { return filepath.Join(os.TempDir(), "mdblip") }
 
 func cachePath(src string) string {
 	key := sha256.Sum256([]byte(mermaidConfig + "\x00" + strconv.Itoa(mermaidScale) + "\x00" + src))

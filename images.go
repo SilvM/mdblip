@@ -54,7 +54,7 @@ func imageSupport() (bool, string) {
 }
 
 // Image IDs belong to the terminal, not the pane, so start somewhere random
-// to keep two mdv panes from overwriting each other's images.
+// to keep two mdblip panes from overwriting each other's images.
 var nextImageID = rand.Uint32N(0xffff00) + 1
 
 func newImageID() uint32 {

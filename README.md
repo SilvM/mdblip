@@ -1,11 +1,11 @@
-# mdv
+# mdblip
 A terminal markdown viewer that follows the file: save in your editor and the change appears at once, with the changed lines flashing in. Gruvbox theme, tables, syntax highlighting, fuzzy search, clickable links and mermaid diagrams.
 
 ## Usage
 ```sh
-mdv notes.md
+mdblip notes.md
 ```
-Press `?` inside `mdv` for the keyboard shortcuts.
+Press `?` inside `mdblip` for the keyboard shortcuts.
 
 ## Dependencies
 ### Build
@@ -39,7 +39,7 @@ Fetched automatically by the build; versions are pinned in `go.mod`.
 
 ## Development
 ```sh
-make            # go mod tidy, vet + tests, build ./mdv
+make            # go mod tidy, vet + tests, build ./mdblip
 make install    # all of the above, then install to ~/.local/bin
 ```
 
@@ -47,14 +47,14 @@ make install    # all of the above, then install to ~/.local/bin
 |---|---|
 | `make tidy` | `go mod tidy` |
 | `make test` | `go vet` and `go test` |
-| `make build` | builds `./mdv` |
+| `make build` | builds `./mdblip` |
 | `make install` | installs to `$(PREFIX)/bin`, default `~/.local/bin`; override with `make install PREFIX=/some/dir` |
-| `make clean` | removes `./mdv` |
+| `make clean` | removes `./mdblip` |
 
 ### Testing without a terminal
 `-headless` prints one frame and exits, which is handy for checking a change or scripting a test:
 ```sh
-./mdv -headless -size 80x24 -keys 'j w ?' notes.md
+./mdblip -headless -size 80x24 -keys 'j w ?' notes.md
 ```
 `-keys` takes the same key names as the `?` menu; add `-ansi` to keep colour codes.
 
