@@ -40,6 +40,9 @@ type model struct {
 	cur           int
 	notice        string
 	hover         string
+	images        bool
+	imagesWhy     string
+	diagrams      map[string]*diagram
 	blips         map[int]int
 	ticking       bool
 	updated       time.Time
@@ -68,7 +71,8 @@ func init() {
 		{[]string{"G", "end"}, "bottom", func(m *model) tea.Cmd { m.scroll(len(m.lines)); return nil }},
 		{[]string{"}"}, "next paragraph", func(m *model) tea.Cmd { m.paragraph(1); return nil }},
 		{[]string{"{"}, "previous paragraph", func(m *model) tea.Cmd { m.paragraph(-1); return nil }},
-		{[]string{"w"}, "toggle line wrap", func(m *model) tea.Cmd { m.wrap = !m.wrap; m.rerender(); return nil }},
+		{[]string{"w"}, "toggle line wrap", func(m *model) tea.Cmd { m.wrap = !m.wrap; return m.rerender() }},
+		{[]string{"m"}, "toggle mermaid diagrams as images", func(m *model) tea.Cmd { return m.toggleImages() }},
 		{[]string{"l", "right"}, "scroll right (unwrapped)", func(m *model) tea.Cmd { m.hscroll(hstep); return nil }},
 		{[]string{"h", "left"}, "scroll left (unwrapped)", func(m *model) tea.Cmd { m.hscroll(-hstep); return nil }},
 		{[]string{"0"}, "back to first column", func(m *model) tea.Cmd { m.xoff = 0; return nil }},
@@ -89,7 +93,7 @@ var (
 	helpDesc  = lipgloss.NewStyle().Foreground(lipgloss.Color(fg))
 )
 
-func (m model) Init() tea.Cmd { return nil }
+func (m model) Init() tea.Cmd { return m.startDiagrams() }
 
 func (m model) page() int { return max(m.height-1, 1) }
 
@@ -120,12 +124,55 @@ func (m *model) hscroll(delta int) {
 	m.xoff = max(min(m.xoff+delta, widest-(m.width-gutter)), 0)
 }
 
-func (m *model) rerender() {
-	m.lines = render(m.src, m.width-gutter, m.wrap)
+// rerender redraws the document after a layout change, without blips.
+func (m *model) rerender() tea.Cmd {
+	lines, cmd := m.renderDoc()
+	m.lines = lines
 	m.blips = nil
 	m.scroll(0)
 	m.hscroll(0)
 	m.search()
+	return cmd
+}
+
+func (m *model) toggleImages() tea.Cmd {
+	if m.imagesWhy != "" {
+		m.notice = "images unavailable: " + m.imagesWhy
+		return nil
+	}
+	m.images = !m.images
+	return tea.Batch(m.startDiagrams(), m.rerender())
+}
+
+// refresh redraws the document after its content changed, blipping the
+// changed lines and optionally scrolling the first one into view.
+func (m *model) refresh(blips, follow bool) tea.Cmd {
+	lines, cmd := m.renderDoc()
+	diff := changed(m.lines, lines)
+	m.lines = lines
+	m.blips = make(map[int]int, len(diff))
+	first := -1
+	for i := range diff {
+		if blips {
+			m.blips[i] = blipFrames
+		}
+		if first < 0 || i < first {
+			first = i
+		}
+	}
+	if follow && first >= 0 && (first < m.offset || first >= m.offset+m.page()) {
+		m.offset = first - m.page()/3
+	}
+	m.scroll(0)
+	m.hscroll(0)
+	offset := m.offset
+	m.search()
+	m.offset = offset
+	if len(m.blips) > 0 && !m.ticking {
+		m.ticking = true
+		return tea.Batch(cmd, tick())
+	}
+	return cmd
 }
 
 func tick() tea.Cmd {
@@ -136,7 +183,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width, m.height = msg.Width, msg.Height
-		m.rerender()
+		return m, m.rerender()
+	case diagramMsg:
+		return m, m.diagramDone(msg)
+	case tea.FocusMsg:
+		return m, m.resend()
 	case reloadMsg:
 		return m.reload(msg)
 	case tickMsg:
@@ -205,32 +256,9 @@ func (m model) reload(msg reloadMsg) (tea.Model, tea.Cmd) {
 	m.src = string(data)
 	m.updated = time.Now()
 	if m.width == 0 {
-		return m, nil
+		return m, m.startDiagrams()
 	}
-	lines := render(m.src, m.width-gutter, m.wrap)
-	diff := changed(m.lines, lines)
-	m.lines = lines
-	m.blips = make(map[int]int, len(diff))
-	first := -1
-	for i := range diff {
-		m.blips[i] = blipFrames
-		if first < 0 || i < first {
-			first = i
-		}
-	}
-	if first >= 0 && (first < m.offset || first >= m.offset+m.page()) {
-		m.offset = first - m.page()/3
-	}
-	m.scroll(0)
-	m.hscroll(0)
-	offset := m.offset
-	m.search()
-	m.offset = offset
-	if len(m.blips) > 0 && !m.ticking {
-		m.ticking = true
-		return m, tick()
-	}
-	return m, nil
+	return m, tea.Batch(m.startDiagrams(), m.refresh(true, true))
 }
 
 func lerp(from, to string, t float64) string {
@@ -291,6 +319,7 @@ func (m model) View() tea.View {
 	v := tea.NewView(b.String())
 	v.AltScreen = true
 	v.MouseMode = tea.MouseModeAllMotion
+	v.ReportFocus = m.images
 	v.WindowTitle = filepath.Base(m.path)
 	return v
 }

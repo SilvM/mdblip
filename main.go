@@ -31,7 +31,7 @@ func main() {
 	if err != nil {
 		fail(err)
 	}
-	m := model{path: path, src: string(data), wrap: true}
+	m := model{path: path, src: string(data), wrap: true, diagrams: map[string]*diagram{}}
 	switch {
 	case *headless:
 		frame, err := frame(m, *size, *keys)
@@ -45,14 +45,24 @@ func main() {
 	case !term.IsTerminal(os.Stdout.Fd()):
 		lipgloss.Println(strings.Join(render(m.src, 80, true), "\n"))
 	default:
+		m.images, m.imagesWhy = imageSupport()
+		if strings.HasPrefix(m.imagesWhy, "tmux") {
+			m.notice = "mermaid images off: " + m.imagesWhy
+		}
 		p := tea.NewProgram(m)
 		stop, err := watch(path, func() { p.Send(reloadMsg{}) })
 		if err != nil {
 			fail(err)
 		}
 		defer stop()
-		if _, err := p.Run(); err != nil {
+		final, err := p.Run()
+		if err != nil {
 			fail(err)
+		}
+		for _, d := range final.(model).diagrams {
+			if d.ready() {
+				fmt.Print(deleteImage(d.id))
+			}
 		}
 	}
 }
