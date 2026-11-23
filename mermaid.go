@@ -31,7 +31,6 @@ type diagram struct {
 	pxW, pxH   int
 	cols, rows int
 	lines      []string
-	err        error
 }
 
 func (d *diagram) ready() bool { return d != nil && d.png != nil }
@@ -120,7 +119,7 @@ func mermaidBlocks(src string, swap func(key, text string) bool) string {
 		for end < len(lines) && !strings.HasPrefix(strings.TrimSpace(lines[end]), open[1]) {
 			end++
 		}
-		text := strings.Join(lines[i+1:min(end, len(lines))], "\n")
+		text := strings.Join(lines[i+1:end], "\n")
 		key := diagramKey(text)
 		if swap(key, text) {
 			out = append(out, "", imgMark+key+imgMark, "")
@@ -137,9 +136,6 @@ func mermaidBlocks(src string, swap func(key, text string) bool) string {
 func (m *model) startDiagrams() tea.Cmd {
 	if !m.images {
 		return nil
-	}
-	if m.diagrams == nil {
-		m.diagrams = map[string]*diagram{}
 	}
 	var cmds []tea.Cmd
 	seen := map[string]bool{}
@@ -176,12 +172,11 @@ func (m *model) diagramDone(msg diagramMsg) tea.Cmd {
 		d.pxW, d.pxH, msg.err = pngSize(msg.png)
 	}
 	if msg.err != nil {
-		d.err = msg.err
 		m.notice = "mermaid: " + strings.SplitN(msg.err.Error(), "\n", 2)[0]
 		return nil
 	}
 	d.id, d.png = newImageID(), msg.png
-	return m.refresh(true, false)
+	return m.refresh(false)
 }
 
 // renderDoc renders the document, showing finished diagrams as images. The
@@ -198,7 +193,10 @@ func (m *model) renderDoc() ([]string, []heading, tea.Cmd) {
 	var cmds []tea.Cmd
 	cellW, ratio := cellSize()
 	for _, l := range lines {
-		match := imgMarkRe.FindStringSubmatch(ansi.Strip(l))
+		var match []string
+		if strings.Contains(l, imgMark) {
+			match = imgMarkRe.FindStringSubmatch(ansi.Strip(l))
+		}
 		if match == nil {
 			out = append(out, l)
 			continue
@@ -223,7 +221,7 @@ func (m *model) resend() tea.Cmd {
 	}
 	var cmds []tea.Cmd
 	for _, d := range m.diagrams {
-		if d.ready() && d.cols > 0 {
+		if d.cols > 0 {
 			cmds = append(cmds, tea.Raw(transmit(d.id, d.png, d.cols, d.rows)))
 		}
 	}

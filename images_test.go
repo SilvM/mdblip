@@ -79,7 +79,7 @@ func TestTransmit(t *testing.T) {
 	for i, c := range chunks {
 		head, payload, _ := strings.Cut(strings.TrimPrefix(c, "\x1b_G"), ";")
 		last := i == len(chunks)-1
-		if len(payload) > chunkSize || (!last && len(payload)%4 != 0) {
+		if len(payload) > kitty.MaxChunkSize || (!last && len(payload)%4 != 0) {
 			t.Errorf("chunk %d payload is %d bytes", i, len(payload))
 		}
 		if (last && !strings.HasSuffix(head, "m=0")) || (!last && !strings.HasSuffix(head, "m=1")) {
@@ -299,7 +299,7 @@ func BenchmarkReload(b *testing.B) {
 		m := benchModel(b, mode.images)
 		b.Run(mode.name, func(b *testing.B) {
 			for b.Loop() {
-				m.refresh(true, true)
+				m.refresh(true)
 			}
 		})
 	}

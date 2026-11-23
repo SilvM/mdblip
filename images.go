@@ -20,8 +20,7 @@ import (
 )
 
 const (
-	chunkSize = 4096
-	maxCells  = 250 // stays inside the placeholder row/column mark table
+	maxCells = 250 // stays inside the placeholder row/column mark table
 	// Image pixels per cell width when the terminal does not report its
 	// size: an 8px cell at the 2x scale diagrams are rendered at.
 	defaultCell = 8 * mermaidScale
@@ -76,7 +75,7 @@ func transmit(id uint32, png []byte, cols, rows int) string {
 	var b strings.Builder
 	opts := []string{"a=T", "U=1", "q=2", "f=100", fmt.Sprintf("i=%d", id), fmt.Sprintf("c=%d", cols), fmt.Sprintf("r=%d", rows)}
 	for first := true; first || len(data) > 0; first = false {
-		chunk := data[:min(chunkSize, len(data))]
+		chunk := data[:min(kitty.MaxChunkSize, len(data))]
 		data = data[len(chunk):]
 		more := "m=0"
 		if len(data) > 0 {

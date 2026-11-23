@@ -29,6 +29,7 @@ const (
 	codeStart = "\ue000"
 	codeEnd   = "\ue001"
 	codeBg    = "\x1b[48;2;60;56;54m"
+	dim       = "\x1b[38;2;146;131;116m"
 )
 
 var resetRe = regexp.MustCompile(`\x1b\[0?m`)

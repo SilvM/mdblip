@@ -1,6 +1,7 @@
 package main
 
 import (
+	"slices"
 	"strings"
 
 	"github.com/charmbracelet/x/ansi"
@@ -33,19 +34,17 @@ func fuzzy(query, line string) bool {
 // search recomputes the matching lines and moves to the first one at or
 // below the top of the screen.
 func (m *model) search() {
-	m.matches, m.matched, m.cur = nil, map[int]bool{}, 0
+	m.matches, m.cur = nil, 0
+	if m.query == "" {
+		return
+	}
 	for i, line := range m.lines {
 		if fuzzy(m.query, ansi.Strip(line)) {
-			if len(m.matches) == 0 || i < m.offset {
-				m.cur = len(m.matches)
-			}
 			m.matches = append(m.matches, i)
-			m.matched[i] = true
 		}
 	}
-	if m.cur < len(m.matches)-1 && m.matches[m.cur] < m.offset {
-		m.cur++
-	}
+	at, _ := slices.BinarySearch(m.matches, m.offset)
+	m.cur = max(min(at, len(m.matches)-1), 0)
 	m.jump(0)
 }
 
@@ -54,7 +53,12 @@ func (m *model) jump(delta int) {
 		return
 	}
 	m.cur = (m.cur + delta + len(m.matches)) % len(m.matches)
-	if line := m.matches[m.cur]; line < m.offset || line >= m.offset+m.page() {
+	m.reveal(m.matches[m.cur])
+}
+
+// reveal scrolls a line into view if it is off screen.
+func (m *model) reveal(line int) {
+	if line < m.offset || line >= m.offset+m.page() {
 		m.offset = line - m.page()/3
 		m.scroll(0)
 	}

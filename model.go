@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -41,7 +42,6 @@ type model struct {
 	searching     bool
 	query         string
 	matches       []int
-	matched       map[int]bool
 	cur           int
 	notice        string
 	hover         string
@@ -62,36 +62,32 @@ type binding struct {
 
 // bindings drives both key dispatch and the help menu: add a shortcut here
 // and it shows up under `?`.
-var bindings []binding
-
-func init() {
-	bindings = []binding{
-		{[]string{"j", "down", "enter"}, "line down", func(m *model) tea.Cmd { m.scroll(1); return nil }},
-		{[]string{"k", "up"}, "line up", func(m *model) tea.Cmd { m.scroll(-1); return nil }},
-		{[]string{"d", "ctrl+d"}, "half page down", func(m *model) tea.Cmd { m.scroll(m.page() / 2); return nil }},
-		{[]string{"u", "ctrl+u"}, "half page up", func(m *model) tea.Cmd { m.scroll(-m.page() / 2); return nil }},
-		{[]string{"space", "f", "pgdown"}, "page down", func(m *model) tea.Cmd { m.scroll(m.page()); return nil }},
-		{[]string{"b", "pgup"}, "page up", func(m *model) tea.Cmd { m.scroll(-m.page()); return nil }},
-		{[]string{"g", "home"}, "top", func(m *model) tea.Cmd { m.offset = 0; return nil }},
-		{[]string{"G", "end"}, "bottom", func(m *model) tea.Cmd { m.scroll(len(m.lines)); return nil }},
-		{[]string{"}"}, "next paragraph", func(m *model) tea.Cmd { m.paragraph(1); return nil }},
-		{[]string{"{"}, "previous paragraph", func(m *model) tea.Cmd { m.paragraph(-1); return nil }},
-		{[]string{"tab"}, "fold or open the section in view (or click a heading)", func(m *model) tea.Cmd { m.toggleFold(m.currentHead()); return nil }},
-		{[]string{"shift+tab"}, "fold or open all sections", func(m *model) tea.Cmd { m.toggleAllFolds(); return nil }},
-		{[]string{"w"}, "toggle line wrap", func(m *model) tea.Cmd { m.wrap = !m.wrap; return m.rerender() }},
-		{[]string{"m"}, "toggle mermaid diagrams as images", func(m *model) tea.Cmd { return m.toggleImages() }},
-		{[]string{"l", "right"}, "scroll right (unwrapped)", func(m *model) tea.Cmd { m.hscroll(hstep); return nil }},
-		{[]string{"h", "left"}, "scroll left (unwrapped)", func(m *model) tea.Cmd { m.hscroll(-hstep); return nil }},
-		{[]string{"0"}, "back to first column", func(m *model) tea.Cmd { m.xoff = 0; return nil }},
-		{[]string{"/"}, "fuzzy search (enter to keep, esc to clear)", func(m *model) tea.Cmd { m.searching, m.query = true, ""; m.search(); return nil }},
-		{[]string{"n"}, "next match", func(m *model) tea.Cmd { m.jump(1); return nil }},
-		{[]string{"N"}, "previous match", func(m *model) tea.Cmd { m.jump(-1); return nil }},
-		{[]string{"?"}, "toggle this help", func(m *model) tea.Cmd { m.help = !m.help; return nil }},
-		{[]string{"q", "ctrl+c"}, "quit", func(*model) tea.Cmd { return tea.Quit }},
-	}
+var bindings = []binding{
+	{[]string{"j", "down", "enter"}, "line down", func(m *model) tea.Cmd { m.scroll(1); return nil }},
+	{[]string{"k", "up"}, "line up", func(m *model) tea.Cmd { m.scroll(-1); return nil }},
+	{[]string{"d", "ctrl+d"}, "half page down", func(m *model) tea.Cmd { m.scroll(m.page() / 2); return nil }},
+	{[]string{"u", "ctrl+u"}, "half page up", func(m *model) tea.Cmd { m.scroll(-m.page() / 2); return nil }},
+	{[]string{"space", "f", "pgdown"}, "page down", func(m *model) tea.Cmd { m.scroll(m.page()); return nil }},
+	{[]string{"b", "pgup"}, "page up", func(m *model) tea.Cmd { m.scroll(-m.page()); return nil }},
+	{[]string{"g", "home"}, "top", func(m *model) tea.Cmd { m.offset = 0; return nil }},
+	{[]string{"G", "end"}, "bottom", func(m *model) tea.Cmd { m.scroll(len(m.lines)); return nil }},
+	{[]string{"}"}, "next paragraph", func(m *model) tea.Cmd { m.paragraph(1); return nil }},
+	{[]string{"{"}, "previous paragraph", func(m *model) tea.Cmd { m.paragraph(-1); return nil }},
+	{[]string{"tab"}, "fold or open the section in view (or click a heading)", func(m *model) tea.Cmd { m.toggleFold(m.currentHead()); return nil }},
+	{[]string{"shift+tab"}, "fold or open all sections", func(m *model) tea.Cmd { m.toggleAllFolds(); return nil }},
+	{[]string{"w"}, "toggle line wrap", func(m *model) tea.Cmd { m.wrap = !m.wrap; return m.rerender() }},
+	{[]string{"m"}, "toggle mermaid diagrams as images", func(m *model) tea.Cmd { return m.toggleImages() }},
+	{[]string{"l", "right"}, "scroll right (unwrapped)", func(m *model) tea.Cmd { m.hscroll(hstep); return nil }},
+	{[]string{"h", "left"}, "scroll left (unwrapped)", func(m *model) tea.Cmd { m.hscroll(-hstep); return nil }},
+	{[]string{"0"}, "back to first column", func(m *model) tea.Cmd { m.xoff = 0; return nil }},
+	{[]string{"/"}, "fuzzy search (enter to keep, esc to clear)", func(m *model) tea.Cmd { m.searching, m.query = true, ""; m.search(); return nil }},
+	{[]string{"n"}, "next match", func(m *model) tea.Cmd { m.jump(1); return nil }},
+	{[]string{"N"}, "previous match", func(m *model) tea.Cmd { m.jump(-1); return nil }},
+	{[]string{"?"}, "toggle this help", func(m *model) tea.Cmd { m.help = !m.help; return nil }},
+	{[]string{"q", "ctrl+c"}, "quit", func(*model) tea.Cmd { return tea.Quit }},
 }
 
-const foldGutter = "\x1b[38;2;146;131;116m▸\x1b[m "
+const foldGutter = dim + "▸\x1b[m "
 
 var (
 	statusBar = lipgloss.NewStyle().Background(lipgloss.Color(bg1)).Foreground(lipgloss.Color(gray))
@@ -126,6 +122,10 @@ func (m *model) blank(i int) bool {
 }
 
 func (m *model) hscroll(delta int) {
+	if m.xoff+delta <= 0 {
+		m.xoff = 0
+		return
+	}
 	widest := 0
 	for _, l := range m.lines {
 		widest = max(widest, ansi.StringWidth(l))
@@ -137,11 +137,7 @@ func (m *model) hscroll(delta int) {
 func (m *model) rerender() tea.Cmd {
 	var cmd tea.Cmd
 	m.all, m.heads, cmd = m.renderDoc()
-	m.applyFolds()
-	m.blips = nil
-	m.scroll(0)
-	m.hscroll(0)
-	m.search()
+	m.refold()
 	return cmd
 }
 
@@ -156,7 +152,7 @@ func (m *model) toggleImages() tea.Cmd {
 
 // refresh redraws the document after its content changed, blipping the
 // changed lines and optionally scrolling the first one into view.
-func (m *model) refresh(blips, follow bool) tea.Cmd {
+func (m *model) refresh(follow bool) tea.Cmd {
 	all, heads, cmd := m.renderDoc()
 	changedLines := changed(m.all, all)
 	m.all, m.heads = all, heads
@@ -164,24 +160,18 @@ func (m *model) refresh(blips, follow bool) tea.Cmd {
 		m.unfoldChanged(changedLines)
 	}
 	m.applyFolds()
-	diff := map[int]bool{}
+	m.blips = map[int]int{}
+	first := -1
 	for i, line := range m.vis {
 		if changedLines[line] {
-			diff[i] = true
-		}
-	}
-	m.blips = make(map[int]int, len(diff))
-	first := -1
-	for i := range diff {
-		if blips {
 			m.blips[i] = blipFrames
-		}
-		if first < 0 || i < first {
-			first = i
+			if first < 0 {
+				first = i
+			}
 		}
 	}
-	if follow && first >= 0 && (first < m.offset || first >= m.offset+m.page()) {
-		m.offset = first - m.page()/3
+	if follow && first >= 0 {
+		m.reveal(first)
 	}
 	m.scroll(0)
 	m.hscroll(0)
@@ -254,10 +244,8 @@ func (m model) press(key string) (model, tea.Cmd) {
 		return m, nil
 	}
 	for _, b := range bindings {
-		for _, k := range b.keys {
-			if k == key {
-				return m, b.run(&m)
-			}
+		if slices.Contains(b.keys, key) {
+			return m, b.run(&m)
 		}
 	}
 	return m, nil
@@ -278,7 +266,7 @@ func (m model) reload(msg reloadMsg) (tea.Model, tea.Cmd) {
 	if m.width == 0 {
 		return m, m.startDiagrams()
 	}
-	return m, tea.Batch(m.startDiagrams(), m.refresh(true, true))
+	return m, tea.Batch(m.startDiagrams(), m.refresh(true))
 }
 
 func lerp(from, to string, t float64) string {
@@ -321,12 +309,13 @@ func (m model) View() tea.View {
 				}
 				line = ansi.Cut(line, m.xoff, m.xoff+width)
 				frames, blipping := m.blips[i]
+				_, matched := slices.BinarySearch(m.matches, i)
 				switch {
 				case blipping:
 					b.WriteString(blip(line, frames, width))
-				case m.matched[i] && i == m.matches[m.cur]:
+				case matched && i == m.matches[m.cur]:
 					b.WriteString(mark(line, orange, 1, 0.3, width))
-				case m.matched[i]:
+				case matched:
 					b.WriteString(mark(line, orange, 0.6, 0, width))
 				case m.foldMark[i]:
 					b.WriteString(foldGutter + line)

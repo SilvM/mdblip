@@ -60,7 +60,8 @@ func (m *model) linkUnder(x, y int) string {
 	return linkAt(m.lines[line], x-gutter+m.xoff)
 }
 
-// click opens the web or mail link under the mouse, if any.
+// click opens the web or mail link under the mouse, or failing that folds
+// or opens the heading on that line.
 func (m *model) click(x, y int) {
 	target := m.linkUnder(x, y)
 	if target == "" {
