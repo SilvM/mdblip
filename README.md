@@ -1,11 +1,35 @@
 # mdblip
-A terminal markdown viewer that follows the file: save in your editor and the change appears at once, with the changed lines flashing in. Gruvbox theme, tables, syntax highlighting, fuzzy search, clickable links and mermaid diagrams.
+A terminal markdown viewer that follows the file: save in your editor and the change appears at once, with the changed lines flashing in. Gruvbox theme, striped tables, syntax highlighting, fuzzy search, folding by heading, clickable links and mermaid diagrams.
 
 ## Usage
 ```sh
 mdblip notes.md
 ```
 Press `?` inside `mdblip` for the keyboard shortcuts.
+
+### Keys
+| Key | Does |
+|---|---|
+| `j` / `k` | line down / up |
+| `d` / `u` | half page down / up |
+| `space`, `f` / `b` | page down / up |
+| `g` / `G` | top / bottom |
+| `}` / `{` | next / previous paragraph |
+| `tab` | fold or open the section in view |
+| `z` | fold or open all sections |
+| `/` | fuzzy search; `enter` keeps it, `esc` clears it |
+| `n` / `p` | next / previous match |
+| `w` | toggle line wrap |
+| `l` / `h`, `0` | scroll right / left when unwrapped, back to first column |
+| `t` | toggle striped table rows |
+| `m` | toggle mermaid diagrams as images |
+| `?` | help |
+| `q` | quit |
+
+### Mouse
+- Click a link to open it; links underline on hover.
+- Click a heading to fold or open its section.
+- The wheel scrolls.
 
 ## Dependencies
 ### Build

@@ -24,11 +24,14 @@ const (
 	orange = "#fe8019"
 )
 
-// Private-use sentinels marking code block boundaries in Glamour's output.
+// Private-use sentinels marking code block boundaries and the rule under a
+// table's header in Glamour's output.
 const (
 	codeStart = "\ue000"
 	codeEnd   = "\ue001"
+	tableRule = "\ue002"
 	codeBg    = "\x1b[48;2;60;56;54m"
+	rowBg     = "\x1b[48;2;50;48;47m"
 	dim       = "\x1b[38;2;146;131;116m"
 )
 
@@ -89,13 +92,19 @@ var gruvbox = ansi.StyleConfig{
 		},
 		Theme: "gruvbox",
 	},
-	Table:                 ansi.StyleTable{StyleBlock: ansi.StyleBlock{StylePrimitive: ansi.StylePrimitive{Color: ptr(fg)}}},
+	Table: ansi.StyleTable{
+		StyleBlock:      ansi.StyleBlock{StylePrimitive: ansi.StylePrimitive{Color: ptr(fg)}},
+		ColumnSeparator: ptr("│"),
+		CenterSeparator: ptr("┼"),
+		RowSeparator:    ptr(tableRule),
+	},
 	DefinitionDescription: ansi.StylePrimitive{BlockPrefix: "\n→ "},
 }
 
 var (
 	renderer      *glamour.TermRenderer
 	rendererWidth int
+	striped       = true
 )
 
 // render returns the rendered lines; with wrap off, lines keep their natural
@@ -146,5 +155,24 @@ func renderMarked(src string, width int, wrap bool) []string {
 			lines[i] = tint(l, codeBg, width)
 		}
 	}
+	stripe(lines)
 	return lines
+}
+
+// stripe tints every other body row of each table. A row whose cells wrap
+// takes several lines, which cannot be told apart from separate rows.
+func stripe(lines []string) {
+	for i := 0; i < len(lines); i++ {
+		if !strings.Contains(lines[i], tableRule) {
+			continue
+		}
+		lines[i] = strings.ReplaceAll(lines[i], tableRule, "─")
+		width := xansi.StringWidth(lines[i])
+		for row := 0; i+1 < len(lines) && strings.TrimSpace(xansi.Strip(lines[i+1])) != ""; row++ {
+			i++
+			if striped && row%2 == 1 {
+				lines[i] = tint(lines[i], rowBg, width)
+			}
+		}
+	}
 }

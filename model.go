@@ -76,6 +76,7 @@ var bindings = []binding{
 	{[]string{"tab"}, "fold or open the section in view (or click a heading)", func(m *model) tea.Cmd { m.toggleFold(m.currentHead()); return nil }},
 	{[]string{"z"}, "fold or open all sections", func(m *model) tea.Cmd { m.toggleAllFolds(); return nil }},
 	{[]string{"w"}, "toggle line wrap", func(m *model) tea.Cmd { m.wrap = !m.wrap; return m.rerender() }},
+	{[]string{"t"}, "toggle striped table rows", func(m *model) tea.Cmd { striped = !striped; return m.rerender() }},
 	{[]string{"m"}, "toggle mermaid diagrams as images", func(m *model) tea.Cmd { return m.toggleImages() }},
 	{[]string{"l", "right"}, "scroll right (unwrapped)", func(m *model) tea.Cmd { m.hscroll(hstep); return nil }},
 	{[]string{"h", "left"}, "scroll left (unwrapped)", func(m *model) tea.Cmd { m.hscroll(-hstep); return nil }},
@@ -286,7 +287,7 @@ func mark(line, color string, bar, bg float64, width int) string {
 	if bg == 0 {
 		return out + " " + line
 	}
-	return out + tint(" "+strings.ReplaceAll(line, codeBg, ""), "\x1b[48;2;"+lerp(bg0, color, bg)+"m", width+1)
+	return out + tint(" "+strings.NewReplacer(codeBg, "", rowBg, "").Replace(line), "\x1b[48;2;"+lerp(bg0, color, bg)+"m", width+1)
 }
 
 func blip(line string, frames, width int) string {
