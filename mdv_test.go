@@ -287,7 +287,7 @@ func shown(t *testing.T, m model, size, keys string) []string {
 	}
 	var lines []string
 	for _, l := range strings.Split(ansi.Strip(out), "\n") {
-		if l = strings.TrimSpace(l); l != "" {
+		if l = strings.TrimSpace(l); l != "" && l != "~" {
 			lines = append(lines, l)
 		}
 	}
@@ -304,9 +304,9 @@ func TestFoldKeys(t *testing.T) {
 		{"40x20", "tab", []string{"▸ # Top ⋯ 14 lines"}},
 		{"40x20", "tab tab", []string{"# Top", "intro", "## One", "alpha", "### Deep", "beta", "## Two", "gamma"}},
 		{"40x6", "} } tab", []string{"▸ ## One ⋯ 7 lines", "## Two", "gamma"}},
-		{"40x20", "shift+tab", []string{"▸ # Top ⋯ 14 lines"}},
-		{"40x20", "shift+tab tab", []string{"# Top", "intro", "▸ ## One ⋯ 7 lines", "▸ ## Two ⋯ 2 lines"}},
-		{"40x20", "shift+tab shift+tab", []string{"# Top", "intro", "## One", "alpha", "### Deep", "beta", "## Two", "gamma"}},
+		{"40x20", "z", []string{"▸ # Top ⋯ 14 lines"}},
+		{"40x20", "z tab", []string{"# Top", "intro", "▸ ## One ⋯ 7 lines", "▸ ## Two ⋯ 2 lines"}},
+		{"40x20", "z z", []string{"# Top", "intro", "## One", "alpha", "### Deep", "beta", "## Two", "gamma"}},
 	}
 	for _, c := range cases {
 		if got := shown(t, m, c.size, c.keys); !reflect.DeepEqual(got, c.want) {

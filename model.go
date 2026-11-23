@@ -70,11 +70,11 @@ var bindings = []binding{
 	{[]string{"space", "f", "pgdown"}, "page down", func(m *model) tea.Cmd { m.scroll(m.page()); return nil }},
 	{[]string{"b", "pgup"}, "page up", func(m *model) tea.Cmd { m.scroll(-m.page()); return nil }},
 	{[]string{"g", "home"}, "top", func(m *model) tea.Cmd { m.offset = 0; return nil }},
-	{[]string{"G", "end"}, "bottom", func(m *model) tea.Cmd { m.scroll(len(m.lines)); return nil }},
+	{[]string{"G", "end"}, "bottom", func(m *model) tea.Cmd { m.offset = max(len(m.lines)-m.page(), 0); return nil }},
 	{[]string{"}"}, "next paragraph", func(m *model) tea.Cmd { m.paragraph(1); return nil }},
 	{[]string{"{"}, "previous paragraph", func(m *model) tea.Cmd { m.paragraph(-1); return nil }},
 	{[]string{"tab"}, "fold or open the section in view (or click a heading)", func(m *model) tea.Cmd { m.toggleFold(m.currentHead()); return nil }},
-	{[]string{"shift+tab"}, "fold or open all sections", func(m *model) tea.Cmd { m.toggleAllFolds(); return nil }},
+	{[]string{"z"}, "fold or open all sections", func(m *model) tea.Cmd { m.toggleAllFolds(); return nil }},
 	{[]string{"w"}, "toggle line wrap", func(m *model) tea.Cmd { m.wrap = !m.wrap; return m.rerender() }},
 	{[]string{"m"}, "toggle mermaid diagrams as images", func(m *model) tea.Cmd { return m.toggleImages() }},
 	{[]string{"l", "right"}, "scroll right (unwrapped)", func(m *model) tea.Cmd { m.hscroll(hstep); return nil }},
@@ -82,7 +82,7 @@ var bindings = []binding{
 	{[]string{"0"}, "back to first column", func(m *model) tea.Cmd { m.xoff = 0; return nil }},
 	{[]string{"/"}, "fuzzy search (enter to keep, esc to clear)", func(m *model) tea.Cmd { m.searching, m.query = true, ""; m.search(); return nil }},
 	{[]string{"n"}, "next match", func(m *model) tea.Cmd { m.jump(1); return nil }},
-	{[]string{"N"}, "previous match", func(m *model) tea.Cmd { m.jump(-1); return nil }},
+	{[]string{"p"}, "previous match", func(m *model) tea.Cmd { m.jump(-1); return nil }},
 	{[]string{"?"}, "toggle this help", func(m *model) tea.Cmd { m.help = !m.help; return nil }},
 	{[]string{"q", "ctrl+c"}, "quit", func(*model) tea.Cmd { return tea.Quit }},
 }
@@ -103,7 +103,7 @@ func (m model) Init() tea.Cmd { return m.startDiagrams() }
 func (m model) page() int { return max(m.height-1, 1) }
 
 func (m *model) scroll(delta int) {
-	m.offset = max(min(m.offset+delta, len(m.lines)-m.page()), 0)
+	m.offset = max(min(m.offset+delta, len(m.lines)-1), 0)
 }
 
 // paragraph moves the top of the screen to the next or previous blank line,
@@ -322,6 +322,8 @@ func (m model) View() tea.View {
 				default:
 					b.WriteString("  " + line)
 				}
+			} else if i > 0 {
+				b.WriteString(dim + "~\x1b[m")
 			}
 			b.WriteByte('\n')
 		}
@@ -353,7 +355,7 @@ func (m model) status() string {
 	}
 	pct := 100
 	if rest := len(m.lines) - m.page(); rest > 0 {
-		pct = m.offset * 100 / rest
+		pct = min(m.offset*100/rest, 100)
 	}
 	s := fmt.Sprintf(" %s  %d%%", filepath.Base(m.path), pct)
 	if !m.wrap {
@@ -376,7 +378,7 @@ func (m model) status() string {
 			s += "  no matches"
 		}
 		if !m.searching {
-			s += "  n/N next/prev  esc clear"
+			s += "  n/p next/prev  esc clear"
 		}
 	default:
 		s += "  ? help"
