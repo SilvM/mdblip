@@ -355,3 +355,14 @@ func TestFoldClickAndReload(t *testing.T) {
 		t.Error("line edited inside the fold did not blip")
 	}
 }
+
+func TestHeadingSpacingFollowsSource(t *testing.T) {
+	var got []string
+	for _, l := range render("# A\n## B\ntext\n\n## C\n\nmore\n\n```sh\n# not a heading\n```\n", 40, true) {
+		got = append(got, strings.TrimSpace(ansi.Strip(l)))
+	}
+	want := []string{"# A", "## B", "text", "", "## C", "", "more", "", "", "# not a heading", "", ""}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("got  %q\nwant %q", got, want)
+	}
+}

@@ -6,6 +6,8 @@ import (
 
 	"charm.land/glamour/v2"
 	"charm.land/glamour/v2/ansi"
+	"github.com/alecthomas/chroma/v2"
+	"github.com/alecthomas/chroma/v2/styles"
 	xansi "github.com/charmbracelet/x/ansi"
 )
 
@@ -101,6 +103,14 @@ var gruvbox = ansi.StyleConfig{
 	DefinitionDescription: ansi.StylePrimitive{BlockPrefix: "\n→ "},
 }
 
+// The stock theme sets comments in italics, which tmux shows as reverse
+// video when its terminal type has no italics.
+func init() {
+	if style, err := styles.Get("gruvbox").Builder().Add(chroma.Comment, "#928374").Build(); err == nil {
+		styles.Register(style)
+	}
+}
+
 var (
 	renderer      *glamour.TermRenderer
 	rendererWidth int
@@ -139,6 +149,7 @@ func renderMarked(src string, width int, wrap bool) []string {
 	for len(lines) > 0 && strings.TrimSpace(lines[len(lines)-1]) == "" {
 		lines = lines[:len(lines)-1]
 	}
+	lines = tighten(lines, tightHeadings(src))
 	for _, l := range lines {
 		width = max(width, xansi.StringWidth(l))
 	}
@@ -175,4 +186,61 @@ func stripe(lines []string) {
 			}
 		}
 	}
+}
+
+var (
+	fenceRe  = regexp.MustCompile("^ {0,3}(```|~~~)")
+	atxRe    = regexp.MustCompile(`^ {0,3}#{1,6}([ \t]|$)`)
+	setextRe = regexp.MustCompile(`^ {0,3}(=+|-+)[ \t]*$`)
+)
+
+// tightHeadings reports, for each heading in the source, whether the line
+// right after it has content.
+func tightHeadings(src string) []bool {
+	lines := strings.Split(src, "\n")
+	var tight []bool
+	fenced := false
+	for i, l := range lines {
+		switch {
+		case fenceRe.MatchString(l):
+			fenced = !fenced
+		case fenced:
+		case atxRe.MatchString(l), i > 0 && strings.TrimSpace(lines[i-1]) != "" && setextRe.MatchString(l):
+			tight = append(tight, i+1 < len(lines) && strings.TrimSpace(lines[i+1]) != "")
+		}
+	}
+	return tight
+}
+
+// tighten drops the blank line Glamour puts after every heading where the
+// source has none, so heading spacing follows the file. It leaves the lines
+// alone if the headings found in the source and in the output do not match.
+func tighten(lines []string, tight []bool) []string {
+	isHead := func(l string) bool { return strings.IndexFunc(l, isHeadMark) >= 0 }
+	n := 0
+	for _, l := range lines {
+		if isHead(l) {
+			n++
+		}
+	}
+	if n != len(tight) {
+		return lines
+	}
+	out := lines[:0]
+	h, drop, gap := -1, false, false
+	for _, l := range lines {
+		blank := strings.TrimSpace(xansi.Strip(l)) == ""
+		switch {
+		case isHead(l):
+			h++
+			drop, gap = tight[h], false
+		case drop && blank:
+			gap = true
+			continue
+		case gap:
+			drop = false
+		}
+		out = append(out, l)
+	}
+	return out
 }
