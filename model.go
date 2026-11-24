@@ -365,6 +365,9 @@ func (m model) status() string {
 	if !m.updated.IsZero() {
 		s += "  updated " + m.updated.Format("15:04:05")
 	}
+	if n := m.rendering(); n > 0 {
+		s += fmt.Sprintf("  rendering diagrams (%d)…", n)
+	}
 	switch {
 	case m.notice != "":
 		s = " " + m.notice

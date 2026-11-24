@@ -181,6 +181,9 @@ func TestDiagramFlow(t *testing.T) {
 	if hasImage(m) || !strings.Contains(ansi.Strip(m.View().Content), "A --> B") {
 		t.Fatal("pending diagram should show as source")
 	}
+	if !strings.Contains(ansi.Strip(m.View().Content), "rendering diagrams (1)") {
+		t.Error("no sign that a diagram is rendering")
+	}
 	if again := run(m.startDiagrams()); len(again) != 0 || calls != 1 {
 		t.Fatal("diagram rendered twice")
 	}
@@ -188,6 +191,9 @@ func TestDiagramFlow(t *testing.T) {
 	m, msgs := step(t, m, started[0])
 	if !hasImage(m) || strings.Contains(ansi.Strip(m.View().Content), "A --> B") {
 		t.Fatal("finished diagram not shown as image")
+	}
+	if strings.Contains(ansi.Strip(m.View().Content), "rendering") {
+		t.Error("rendering sign left after the diagram finished")
 	}
 	if sent := raws(msgs); strings.Count(sent, "a=T") != 1 {
 		t.Fatalf("image transmitted %d times, want 1", strings.Count(sent, "a=T"))

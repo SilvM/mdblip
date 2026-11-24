@@ -31,6 +31,7 @@ type diagram struct {
 	pxW, pxH   int
 	cols, rows int
 	lines      []string
+	failed     bool
 }
 
 func (d *diagram) ready() bool { return d != nil && d.png != nil }
@@ -172,11 +173,23 @@ func (m *model) diagramDone(msg diagramMsg) tea.Cmd {
 		d.pxW, d.pxH, msg.err = pngSize(msg.png)
 	}
 	if msg.err != nil {
+		d.failed = true
 		m.notice = "mermaid: " + strings.SplitN(msg.err.Error(), "\n", 2)[0]
 		return nil
 	}
 	d.id, d.png = newImageID(), msg.png
 	return m.refresh(false)
+}
+
+// rendering counts the diagrams still being turned into images.
+func (m *model) rendering() int {
+	n := 0
+	for _, d := range m.diagrams {
+		if m.images && !d.ready() && !d.failed {
+			n++
+		}
+	}
+	return n
 }
 
 // renderDoc renders the document, showing finished diagrams as images. The
