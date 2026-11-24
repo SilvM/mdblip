@@ -27,6 +27,8 @@ const (
 	// A cell wider than this is taken to be reported in device pixels on a
 	// high-density display, which already match the 2x image.
 	maxLogicalCell = 12
+	// A diagram grows with the pane up to this many times its natural size.
+	maxZoom = 2
 )
 
 // imageSupport reports whether inline images can be shown, and if not, why.
@@ -128,10 +130,11 @@ func cellSize() (width int, ratio float64) {
 	return int(w), w / h
 }
 
-// fit returns the cell box for an image of the given pixel size: its natural
-// width, shrunk to the available width, with the height following the aspect.
+// fit returns the cell box for an image of the given pixel size: as wide as
+// the available width allows, up to maxZoom times its natural width, with
+// the height following the aspect.
 func fit(pxW, pxH, avail, cellW int, ratio float64) (cols, rows int) {
-	cols = max(min(pxW/max(cellW, 1), avail, maxCells), 1)
+	cols = max(min(maxZoom*pxW/max(cellW, 1), avail, maxCells), 1)
 	rows = int(math.Ceil(float64(cols) * float64(pxH) / float64(pxW) * ratio))
 	if rows > maxCells {
 		cols = max(cols*maxCells/rows, 1)

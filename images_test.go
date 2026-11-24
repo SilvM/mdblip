@@ -97,10 +97,11 @@ func TestTransmit(t *testing.T) {
 
 func TestFit(t *testing.T) {
 	cases := []struct{ pxW, pxH, avail, wantCols, wantRows int }{
-		{960, 480, 100, 60, 15},
+		{960, 480, 200, 120, 30},
+		{960, 480, 100, 100, 25},
 		{960, 480, 40, 40, 10},
 		{160, 16000, 100, 2, 100},
-		{16, 16, 100, 1, 1},
+		{16, 16, 100, 2, 1},
 	}
 	for _, c := range cases {
 		cols, rows := fit(c.pxW, c.pxH, c.avail, 16, 0.5)

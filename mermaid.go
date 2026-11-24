@@ -203,6 +203,12 @@ func (m *model) renderDoc() ([]string, []heading, tea.Cmd) {
 		}
 		d := m.diagrams[match[1]]
 		if cols, rows := fit(d.pxW, d.pxH, width, cellW, ratio); cols != d.cols || rows != d.rows {
+			// A resized image gets a new ID: terminals may keep showing the
+			// old placement for an ID they have already drawn.
+			if d.cols > 0 {
+				cmds = append(cmds, tea.Raw(deleteImage(d.id)))
+				d.id = newImageID()
+			}
 			d.cols, d.rows = cols, rows
 			d.lines = placeholderRows(d.id, cols, rows)
 			cmds = append(cmds, tea.Raw(transmit(d.id, d.png, cols, rows)))
