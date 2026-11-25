@@ -304,8 +304,8 @@ func TestFoldKeys(t *testing.T) {
 		{"40x20", "tab", []string{"▸ # Top ⋯ 14 lines"}},
 		{"40x20", "tab tab", []string{"# Top", "intro", "## One", "alpha", "### Deep", "beta", "## Two", "gamma"}},
 		{"40x6", "} } tab", []string{"▸ ## One ⋯ 7 lines", "## Two", "gamma"}},
-		{"40x20", "z", []string{"▸ # Top ⋯ 14 lines"}},
-		{"40x20", "z tab", []string{"# Top", "intro", "▸ ## One ⋯ 7 lines", "▸ ## Two ⋯ 2 lines"}},
+		{"40x20", "z", []string{"# Top", "intro", "▸ ## One ⋯ 7 lines", "▸ ## Two ⋯ 2 lines"}},
+		{"40x20", "z tab", []string{"▸ # Top ⋯ 14 lines"}},
 		{"40x20", "z z", []string{"# Top", "intro", "## One", "alpha", "### Deep", "beta", "## Two", "gamma"}},
 	}
 	for _, c := range cases {

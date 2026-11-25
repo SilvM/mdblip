@@ -120,7 +120,8 @@ func (m *model) toggleFold(h int) {
 	m.refold()
 }
 
-// toggleAllFolds folds every section, or opens them all if all are folded,
+// toggleAllFolds folds every section below the document's top heading level,
+// or opens them all if all are folded,
 // keeping the current heading (or the folded heading above it) in view.
 func (m *model) toggleAllFolds() {
 	cur := m.currentHead()
@@ -128,12 +129,16 @@ func (m *model) toggleAllFolds() {
 		return
 	}
 	fold := false
+	top := 6
 	for _, head := range m.heads {
-		fold = fold || !m.folded[head.key]
+		top = min(top, head.level)
+	}
+	for _, head := range m.heads {
+		fold = fold || head.level > top && !m.folded[head.key]
 	}
 	m.folded = map[string]bool{}
 	for _, head := range m.heads {
-		m.folded[head.key] = fold
+		m.folded[head.key] = fold && head.level > top
 	}
 	m.applyFolds()
 	for ; cur >= 0; cur-- {
